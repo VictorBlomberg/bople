@@ -1,0 +1,23 @@
+{
+  /* https://www.typescriptlang.org/tsconfig */
+  "include": ["src/**/*"],
+  "compilerOptions": {
+    "target": "es2016",
+    "outDir": "./dist",
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "alwaysStrict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "strict": true,
+
+    "skipLibCheck": true
+  }
+}
