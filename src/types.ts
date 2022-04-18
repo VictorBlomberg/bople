@@ -1,10 +1,21 @@
-export type UrlTemplate = string;
+export type UrlSearchTermTemplate = string;
+export type UrlRedirectTemplate = string;
 
-export type FallbackRule = ["fallback", UrlTemplate];
-export type KeywordRule = ["keyword", string, UrlTemplate];
+export type FallbackRule = ["fallback", UrlSearchTermTemplate];
+export type KeywordRule = ["keyword", string, UrlSearchTermTemplate];
+export type KeywordRedirectRule = [
+  "keyword-redirect",
+  string,
+  { host: string | null },
+  UrlRedirectTemplate
+];
 export type ShortcutRule = ["shortcut", string, string];
 
-export type Rule = FallbackRule | KeywordRule | ShortcutRule;
+export type Rule =
+  | FallbackRule
+  | KeywordRule
+  | KeywordRedirectRule
+  | ShortcutRule;
 export type RuleType = Rule[0];
 export type Rules = Rule[];
 

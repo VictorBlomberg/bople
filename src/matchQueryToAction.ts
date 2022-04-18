@@ -2,6 +2,7 @@ import {
   Action,
   FallbackRule,
   InternalAction,
+  KeywordRedirectRule,
   KeywordRule,
   Rule,
   Rules,
@@ -24,6 +25,13 @@ export function matchQueryToAction(rules: Rules, query: string): Action | null {
             queryWordsUppercase
           );
         }
+        case "keyword-redirect": {
+          return matchSearchQueryWithKeywordRedirectRule(
+            rule,
+            query,
+            queryWordsUppercase
+          );
+        }
         case "fallback": {
           return matchSearchQueryWithFallbackRule(rule, query);
         }
@@ -35,7 +43,8 @@ export function matchQueryToAction(rules: Rules, query: string): Action | null {
     .filter((match): match is Action => match != null)
     .sort((a, b) => {
       const typeWeights: Record<RuleType, number> = {
-        shortcut: -2,
+        shortcut: -3,
+        "keyword-redirect": -2,
         keyword: -1,
         fallback: 0,
       };
@@ -64,10 +73,54 @@ function matchSearchQueryWithKeywordRule(
       .filter((word) => word.toUpperCase() !== keyword.toUpperCase())
       .join(" ");
 
-    return createAction(keywordRule, actionString, searchTerms);
+    return createAction(keywordRule, actionString, searchTerms, null);
   }
 
   return null;
+}
+
+function matchSearchQueryWithKeywordRedirectRule(
+  keywordRedirectRule: KeywordRedirectRule,
+  query: string,
+  queryWordsUppercase: string[]
+): Action | null {
+  const keyword = keywordRedirectRule[1];
+  const match = keywordRedirectRule[2];
+  const actionString = keywordRedirectRule[3];
+
+  if (
+    !queryWordsUppercase.some(
+      (wordUppercase) => wordUppercase === keyword.toUpperCase()
+    )
+  ) {
+    return null;
+  }
+
+  const sourceUrlString = query
+    .split(" ")
+    .filter((word) => word.toUpperCase() !== keyword.toUpperCase())
+    .join(" ");
+
+  let sourceUrl: URL;
+  try {
+    sourceUrl = new URL(sourceUrlString);
+  } catch {
+    return null;
+  }
+
+  const isHostMatch =
+    match.host == null ||
+    match.host.toUpperCase() === sourceUrl.host.toUpperCase();
+  if (!isHostMatch) {
+    return null;
+  }
+
+  return createAction(
+    keywordRedirectRule,
+    actionString,
+    sourceUrlString,
+    sourceUrl
+  );
 }
 
 function matchSearchQueryWithFallbackRule(
@@ -75,7 +128,7 @@ function matchSearchQueryWithFallbackRule(
   query: string
 ): Action | null {
   const actionString = fallbackRule[1];
-  return createAction(fallbackRule, actionString, query);
+  return createAction(fallbackRule, actionString, query, null);
 }
 
 function matchSearchQueryWithShortcutRule(
@@ -85,13 +138,18 @@ function matchSearchQueryWithShortcutRule(
   const shortcut = shortcutRule[1];
   if (query.toUpperCase() === shortcut.toUpperCase()) {
     const actionString = shortcutRule[2];
-    return createAction(shortcutRule, actionString, query);
+    return createAction(shortcutRule, actionString, query, null);
   }
 
   return null;
 }
 
-function createAction(rule: Rule, actionString: string, query: string): Action {
+function createAction(
+  rule: Rule,
+  actionString: string,
+  query: string,
+  sourceUrl: URL | null
+): Action {
   const internalPrefix = "@action:";
   if (actionString.toUpperCase().startsWith(internalPrefix)) {
     return {
@@ -107,7 +165,7 @@ function createAction(rule: Rule, actionString: string, query: string): Action {
     actionString.startsWith("https://") ||
     actionString.startsWith("http://")
   ) {
-    const url = expandTemplateUrl(actionString, query);
+    const url = expandTemplateUrl(actionString, query, sourceUrl);
     let validUrl: boolean;
     try {
       new URL(url);
@@ -128,6 +186,19 @@ function createAction(rule: Rule, actionString: string, query: string): Action {
   return { type: "invalid", rule };
 }
 
-function expandTemplateUrl(urlTemplate: string, searchTerms: string): string {
-  return urlTemplate.replace(/\{searchterms\}/gi, searchTerms);
+function expandTemplateUrl(
+  urlTemplate: string,
+  searchTerms: string,
+  sourceUrl: URL | null
+): string {
+  let result = urlTemplate.replace(/\{searchterms\}/gi, searchTerms);
+
+  if (sourceUrl != null) {
+    result = result.replace(/\{host\}/gi, sourceUrl.host);
+    result = result.replace(/\{path\}/gi, sourceUrl.pathname);
+    result = result.replace(/\{query\}/gi, sourceUrl.search);
+    result = result.replace(/\{fragment\}/gi, sourceUrl.hash);
+  }
+
+  return result;
 }
